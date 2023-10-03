@@ -1,6 +1,7 @@
 package com.example.manage_user_use_jsp_servlet_jdbc_mysql.Service;
 
 import com.example.manage_user_use_jsp_servlet_jdbc_mysql.Model.User;
+import jdk.vm.ci.code.site.Call;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -120,5 +121,43 @@ public class JDBCUser implements IUser{
         }
     }
 
+    @Override
+    public User getUserById(int id) {
+        User user = null;
+        String query = "{CALL get_user_by_id(?)}";
+        Connection connection = connect();
+        CallableStatement callableStatement = null;
+        try {
+            callableStatement = connection.prepareCall(query);
+            callableStatement.setInt(1, id);
+            ResultSet resultSet = callableStatement.executeQuery(query);
 
+            while (resultSet.next()) {
+                String name = resultSet.getString("name");
+                String email = resultSet.getString("email");
+                String country = resultSet.getString("country");
+                user = new User(id, name, email, country);
+            }
+        } catch (SQLException e) {
+            printSQLException(e);
+        }
+        return user;
+    }
+
+    @Override
+    public void insertUserStore(User user) throws SQLException {
+        String query = "{CALL insert_user(?,?,?)}";
+        Connection connection = connect();
+        CallableStatement callableStatement = null;
+        try {
+            callableStatement = connection.prepareCall(query);
+            callableStatement.setString(1, user.getName());
+            callableStatement.setString(2, user.getEmail());
+            callableStatement.setString(3, user.getCountry());
+            callableStatement.executeUpdate();
+            System.out.println(callableStatement);
+        } catch (SQLException e) {
+            printSQLException(e);
+        }
+    }
 }
