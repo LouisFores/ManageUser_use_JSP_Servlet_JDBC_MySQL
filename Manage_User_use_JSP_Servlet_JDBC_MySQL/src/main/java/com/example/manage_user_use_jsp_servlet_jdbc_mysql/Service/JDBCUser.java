@@ -1,6 +1,7 @@
 package com.example.manage_user_use_jsp_servlet_jdbc_mysql.Service;
 
 import com.example.manage_user_use_jsp_servlet_jdbc_mysql.Model.User;
+import jdk.vm.ci.code.site.Call;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -120,5 +121,104 @@ public class JDBCUser implements IUser{
         }
     }
 
+    @Override
+    public User getUserById(int id) {
+        User user = null;
+        String query = "{CALL get_user_by_id(?)}";
+        Connection connection = connect();
+        CallableStatement callableStatement = null;
+        try {
+            callableStatement = connection.prepareCall(query);
+            callableStatement.setInt(1, id);
+            ResultSet resultSet = callableStatement.executeQuery(query);
 
+            while (resultSet.next()) {
+                String name = resultSet.getString("name");
+                String email = resultSet.getString("email");
+                String country = resultSet.getString("country");
+                user = new User(id, name, email, country);
+            }
+        } catch (SQLException e) {
+            printSQLException(e);
+        }
+        return user;
+    }
+
+    @Override
+    public void insertUserStore(User user) throws SQLException {
+        String query = "{CALL insert_user(?,?,?)}";
+        Connection connection = connect();
+        CallableStatement callableStatement = null;
+        try {
+            callableStatement = connection.prepareCall(query);
+            callableStatement.setString(1, user.getName());
+            callableStatement.setString(2, user.getEmail());
+            callableStatement.setString(3, user.getCountry());
+            callableStatement.executeUpdate();
+            System.out.println(callableStatement);
+        } catch (SQLException e) {
+            printSQLException(e);
+        }
+    }
+
+    @Override
+    public void addUserTransaction(User user, List<Integer> permissions) {
+        Connection connection = null;
+        PreparedStatement statement = null;
+        PreparedStatement statementAssignment = null;
+        ResultSet resultSet = null;
+        try {
+           connection = connect();
+           // Set auto commit to false
+           connection.setAutoCommit(false);
+           // Insert user
+           statement = connection.prepareStatement(INSERT_USERS_SQL,Statement.RETURN_GENERATED_KEYS);
+           statement.setString(1, user.getName());
+           statement.setString(2, user.getEmail());
+           statement.setString(3, user.getCountry());
+           int rowAffected = statement.executeUpdate();
+           // get user id
+            resultSet = statement.getGeneratedKeys();
+
+            int userId = 0;
+            if (resultSet.next()) userId = resultSet.getInt(1);
+
+            // in case the insert operation successes, assign permission to user
+            if (rowAffected == 1) {
+                //passion permission to user
+                String sqlPivot = "INSERT INTO user_permission(user_id, permission_id)" + "VALUES(?,?)";
+                statementAssignment = connection.prepareStatement(sqlPivot);
+
+                for (int permissionId : permissions) {
+                    statementAssignment.setInt(1, userId);
+                    statementAssignment.setInt(2, permissionId);
+                    statementAssignment.executeUpdate();
+                }
+
+                connection.commit();
+            } else {
+                connection.rollback();
+            }
+
+        } catch (SQLException e) {
+            // roll back the transaction
+            try {
+                if (connection != null) {
+                    connection.rollback();
+                }
+            } catch (SQLException ex) {
+                System.out.println(e.getMessage());
+            }
+            System.out.println(e.getMessage());
+        } finally {
+            try {
+                if (resultSet != null) resultSet.close();
+                if (statement != null) statement.close();
+                if (statementAssignment != null) statementAssignment.close();
+                if (connection != null) connection.close();
+            } catch (SQLException e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
 }
